@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 
 #define SMAXLEN 50
 
@@ -43,26 +44,44 @@ void dwin(WINDOW *lwin) {
 	delwin(lwin);
 }
 
+char *mktstr(char *str, time_t *t, struct tm *tm) {
+
+	*t = time(NULL);
+	*tm = *localtime(&*t);
+	sprintf(str, "%02d:%02d:%02d", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	
+	return str;
+}
+
 int usage(char *cmd) {
 
-	printf("Usage: %s [-dsp]]\n", cmd);
+	printf("Usage: %s [-dsp] [message] - NCurses Window Bounce\n", cmd);
+	printf("Bounces [message] around the screen\n\n");
+	printf("Options:\n");
 	printf("	-d: Show debug information\n");
-	printf("	-s [ms]: Sleep per cycle\n");
-	printf("	-p [size]: Char size in padding\n");
+	printf("	-h: Displays this text\n");
+	printf("	-s [ms]: Sleep per cycle (default: 100)\n");
+	printf("	-t: Use current time as message\n");
+	printf("	-p [size]: # of chars padding (default: 2)\n");
+
 	return 1;
 }
 
 int main(int argc, char *argv[]) {
 
+
 	char str[SMAXLEN];
 	int debug = 0;
 	int pad = 2;
+	int st = 0;
+	unsigned long slp = 100000;
 
-	long slp = 100000;
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
 
 	int optc;
 
-	while((optc = getopt(argc, argv, "ds:p:")) != -1) {
+	while((optc = getopt(argc, argv, "dhts:p:")) != -1) {
 		switch (optc) {
 
 			case 'd':
@@ -71,7 +90,15 @@ int main(int argc, char *argv[]) {
 
 			case 's':
 				slp = atoi(optarg) * 1000;
-				if (slp == 0) return usage(argv[0]);
+				if (slp <= 0) return usage(argv[0]);
+				break;
+
+			case 't':
+				st++;
+				break;
+
+			case 'h':
+				return usage(argv[0]);
 				break;
 
 			case 'p':
@@ -87,7 +114,11 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if (argc > optind) strcpy(str, argv[optind]); 
+	if (argc > optind) {
+		if (strlen(argv[optind]) > SMAXLEN || st) 
+			return usage(argv[0]);
+		else strcpy(str, argv[optind]); 
+	} else if (st) strcpy(str, mktstr(str, &t, &tm));
 	else strcpy(str, getenv("USER"));
 
 	ncinit();
@@ -104,6 +135,12 @@ int main(int argc, char *argv[]) {
 	int wsx = xctr - ((len / 2) + pad);
 
 	int xi = 0, yi = 0;
+
+	if (LINES < (pad * 2) + 3 || COLS < (pad * 2) + len + 2) {
+		endwin();
+		printf("Unreasonable padding!\n");
+		return usage(argv[0]);
+	}
 
 	bkgd(COLOR_PAIR(1));
 	refresh();
@@ -143,6 +180,11 @@ int main(int argc, char *argv[]) {
 		if (debug) {
 			mvprintw(7,5,"wsy: %d", wsy);
 			mvprintw(8,5,"wsx: %d", wsx);
+		}
+
+		if (st) {
+			strcpy(str, mktstr(str, &t, &tm));
+			mvwprintw(txwin, pad + 1, pad + 1, "%s", str);
 		}
 
 		mvwin(txwin, wsy, wsx);
