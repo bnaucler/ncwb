@@ -2,12 +2,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <time.h>
 
 #define SMAXLEN 50
 
 int ncinit() {
-	
+
 	initscr();
 	noecho();
 	cbreak();
@@ -21,7 +22,7 @@ int ncinit() {
 	return 0;
 }
 
-WINDOW *mkwin(char *str, int wh, int ww, int wsy, int wsx, int pad, int cp) {	
+WINDOW *mkwin(char *str, int wh, int ww, int wsy, int wsx, int pad, int cp) {
 
 	WINDOW *lwin;
 
@@ -37,7 +38,7 @@ WINDOW *mkwin(char *str, int wh, int ww, int wsy, int wsx, int pad, int cp) {
 	return lwin;
 }
 
-void dwin(WINDOW *lwin) {	
+void dwin(WINDOW *lwin) {
 
 	wborder(lwin, ' ', ' ', ' ',' ',' ',' ',' ',' ');
 	wrefresh(lwin);
@@ -49,7 +50,7 @@ char *mktstr(char *str, time_t *t, struct tm *tm) {
 	*t = time(NULL);
 	*tm = *localtime(&*t);
 	sprintf(str, "%02d:%02d:%02d", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	
+
 	return str;
 }
 
@@ -67,8 +68,18 @@ int usage(char *cmd) {
 	return 1;
 }
 
+void cleanup(int sig) {
+
+	signal(sig, SIG_IGN);
+	curs_set(1);
+	endwin();
+
+	exit(0);
+}
+
 int main(int argc, char *argv[]) {
 
+	signal(SIGINT, cleanup);
 
 	char str[SMAXLEN];
 	int debug = 0;
@@ -115,9 +126,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (argc > optind) {
-		if (strlen(argv[optind]) > SMAXLEN || st) 
+		if (strlen(argv[optind]) > SMAXLEN || st)
 			return usage(argv[0]);
-		else strcpy(str, argv[optind]); 
+		else strcpy(str, argv[optind]);
 	} else if (st) strcpy(str, mktstr(str, &t, &tm));
 	else strcpy(str, getenv("USER"));
 
@@ -137,6 +148,7 @@ int main(int argc, char *argv[]) {
 	int xi = 0, yi = 0;
 
 	if (LINES < (pad * 2) + 3 || COLS < (pad * 2) + len + 2) {
+		curs_set(1);
 		endwin();
 		printf("Unreasonable padding!\n");
 		return usage(argv[0]);
@@ -195,8 +207,5 @@ int main(int argc, char *argv[]) {
 		usleep(slp);
 	}
 
-	dwin(txwin);
-	curs_set(1);
-	endwin();
 	return 0;
 }
