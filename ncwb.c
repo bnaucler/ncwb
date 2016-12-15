@@ -6,6 +6,11 @@
 #include <time.h>
 
 #define SMAXLEN 50
+#define SBCH 256
+#define BBCH 1024
+
+#define RED				"\x1B[1m\033[31m"
+#define RESET			"\033[0m"
 
 int ncinit() {
 
@@ -26,15 +31,32 @@ WINDOW *mkwin(char *str, int wh, int ww, int wsy, int wsx, int pad, int cp) {
 
 	WINDOW *lwin;
 
+	char *token = calloc(SBCH, sizeof(char));
+
 	lwin = newwin(wh, ww, wsy, wsx);
 	wbkgd(lwin, COLOR_PAIR(cp));
 	attron(COLOR_PAIR(cp));
 	box(lwin, 0 , 0);
-	mvwprintw(lwin, pad + 1, pad + 1, "%s", str);
+
+	if (strstr(str, "\n") == NULL) {
+		mvwprintw(lwin, pad + 1, pad + 1, "%s", str);
+
+	} else {
+		token = strtok(str, "\n");
+		int vloc = pad + 1;
+
+		while(token != NULL) {
+			strcpy(str, token);
+			mvwprintw(lwin, vloc++, pad + 1, "%s", str);
+			token = strtok(NULL, "\n");
+		}
+	}
+
 	refresh();
 	wrefresh(lwin);
 	attroff(COLOR_PAIR(cp));
 
+	free(token);
 	return lwin;
 }
 
@@ -45,27 +67,31 @@ void dwin(WINDOW *lwin) {
 	delwin(lwin);
 }
 
-char *mktstr(char *str, time_t *t, struct tm *tm) {
+int cchar(char *buf, char ch) {
 
-	*t = time(NULL);
-	*tm = *localtime(&*t);
-	sprintf(str, "%02d:%02d:%02d", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	int count = 0;
+	int len = strlen(buf);
 
-	return str;
+	for(int a = 0; a < len; a++) { if(buf[a] == ch) count++; }
+
+	return count;
+
 }
 
-int usage(char *cmd) {
+int usage(char *cmd, char *err, int ret) {
 
-	printf("Usage: %s [-dsp] [message] - NCurses Window Bounce\n", cmd);
-	printf("Bounces [message] around the screen\n\n");
+	if (strlen(err) > 0 ) { printf(RED "ERROR: " RESET "%s\n", err); }
+	printf("NCurses Window Bounce - Bounces [message] around the screen\n\n");
+	printf("Usage: %s [-dfstp] [message]\n", cmd);
 	printf("Options:\n");
 	printf("	-d: Show debug information\n");
+	printf("	-f: Use figlet\n");
 	printf("	-h: Displays this text\n");
 	printf("	-s [ms]: Sleep per cycle (default: 100)\n");
 	printf("	-t: Use current time as message\n");
 	printf("	-p [size]: # of chars padding (default: 2)\n");
 
-	return 1;
+	exit(ret);
 }
 
 void cleanup(int sig) {
@@ -77,14 +103,54 @@ void cleanup(int sig) {
 	exit(0);
 }
 
+char *mkfstr(char *str, char *estr, char *cmd, int *len) {
+
+	char cstr[SBCH];
+	char sbuf[SBCH];
+	char bbuf[BBCH];
+
+	strcpy(cstr, "figlet ");
+	strcat(cstr, str);
+
+	FILE *fout = popen(cstr, "r");
+	if (fout == NULL) {
+		sprintf(estr,"Could not execute %s\n", cstr);
+		usage(cmd, estr, 1);
+
+	} else {
+		while(fgets(sbuf, SBCH, fout)) {
+			*len = strlen(sbuf);
+			if (*len > SMAXLEN) {
+				usage(cmd, "String too long", 1);
+			}
+			strcat(bbuf, sbuf);
+		}
+		bbuf[(strlen(bbuf) + 1)] = '\0';
+	}
+	pclose(fout);
+
+	strcpy(str, bbuf);
+	return str;
+}
+
+char *mktstr(char *str, time_t *t, struct tm *tm) {
+
+	*t = time(NULL);
+	*tm = *localtime(&*t);
+	sprintf(str, "%02d:%02d:%02d", tm->tm_hour, tm->tm_min, tm->tm_sec);
+
+	return str;
+}
+
 int main(int argc, char *argv[]) {
 
 	signal(SIGINT, cleanup);
 
-	char str[SMAXLEN];
-	int debug = 0;
-	int pad = 2;
-	int st = 0;
+	char *str = calloc(BBCH, sizeof(char));
+	char *estr = calloc(SBCH, sizeof(char));
+
+	int debug = 0, fig = 0, st = 0;
+	int pad = 2, lns = 1;
 	unsigned long slp = 100000;
 
 	time_t t = time(NULL);
@@ -92,16 +158,20 @@ int main(int argc, char *argv[]) {
 
 	int optc;
 
-	while((optc = getopt(argc, argv, "dhts:p:")) != -1) {
+	while((optc = getopt(argc, argv, "dfhts:p:")) != -1) {
 		switch (optc) {
 
 			case 'd':
 				debug++;
 				break;
 
+			case 'f':
+				fig++;
+				break;
+
 			case 's':
 				slp = atoi(optarg) * 1000;
-				if (slp <= 0) return usage(argv[0]);
+				if (slp <= 0) return usage(argv[0], "", 0);
 				break;
 
 			case 't':
@@ -109,7 +179,7 @@ int main(int argc, char *argv[]) {
 				break;
 
 			case 'h':
-				return usage(argv[0]);
+				return usage(argv[0], "", 0);
 				break;
 
 			case 'p':
@@ -117,7 +187,7 @@ int main(int argc, char *argv[]) {
 				break;
 
 			case '?':
-				return usage(argv[0]);
+				return usage(argv[0], "", 0);
 				break;
 
 			default:
@@ -126,45 +196,54 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (argc > optind) {
-		if (strlen(argv[optind]) > SMAXLEN || st)
-			return usage(argv[0]);
-		else strcpy(str, argv[optind]);
+		if (strlen(argv[optind]) > SMAXLEN) {
+			sprintf(estr, "Message is %ld chars long. Maximal length allowed is %d", strlen(argv[optind]), SMAXLEN);
+			return usage(argv[0], estr, 1);
+		} else if (st) {
+			return usage(argv[0], "-t cannot be combined with a custom message.\n", 1);
+		} else strcpy(str, argv[optind]);
 	} else if (st) strcpy(str, mktstr(str, &t, &tm));
 	else strcpy(str, getenv("USER"));
+
+	int len = strlen(str);
+
+	if (fig) {
+		if (st) { 
+			return usage(argv[0], "-t and -f cannot be combined", 1);
+		} else { 
+			strcpy(str, mkfstr(str, estr, argv[0], &len));
+			lns = cchar(str, '\n');
+		}
+	}
 
 	ncinit();
 	WINDOW *txwin;
 
 	int cp = 2;
-	int yctr = LINES / 2;
-	int xctr = COLS / 2;
-	int len = strlen(str);
 
-	int wh = (pad * 2) + 3;
+	int wh = (pad * 2) + 2 + lns;
 	int ww = len + (pad * 2) + 2;
-	int wsy = yctr - (pad + 1);
-	int wsx = xctr - ((len / 2) + pad);
+	int wsy = (LINES / 2) - (pad + 1 + (lns / 2));
+	int wsx = (COLS / 2) - ((len / 2) + pad);
 
 	int xi = 0, yi = 0;
 
 	if (LINES < (pad * 2) + 3 || COLS < (pad * 2) + len + 2) {
 		curs_set(1);
 		endwin();
-		printf("Unreasonable padding!\n");
-		return usage(argv[0]);
+		return usage(argv[0], "Unreasonable padding!", 1);
 	}
 
 	bkgd(COLOR_PAIR(1));
 	refresh();
 
 	if (debug) {
-		mvprintw(5,5,"wh: %d", wh);
-		mvprintw(6,5,"ww: %d", ww);
-		mvprintw(7,5,"wsy: %d", wsy);
-		mvprintw(8,5,"wsx: %d", wsx);
-		mvprintw(9,5,"len: %d", len);
-		mvprintw(10,5,"yctr: %d", yctr);
-		mvprintw(11,5,"xctr: %d", xctr);
+		mvprintw(5,5,"Window height: %03d", wh);
+		mvprintw(6,5,"Window width: %03d", ww);
+		mvprintw(7,5,"Upper left corner, X-axis: %03d", wsx);
+		mvprintw(8,5,"Upper left corner, Y-axis: %03d", wsy);
+		mvprintw(9,5,"String length: %02d", len);
+		mvprintw(10,5,"String height: %02d", lns);
 	}
 
 	txwin = mkwin(str, wh, ww, wsy, wsx, pad, cp);
@@ -190,8 +269,8 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (debug) {
-			mvprintw(7,5,"wsy: %d", wsy);
-			mvprintw(8,5,"wsx: %d", wsx);
+			mvprintw(7,5,"Upper left corner, X-axis: %03d", wsx);
+			mvprintw(8,5,"Upper left corner, Y-axis: %03d", wsy);
 		}
 
 		if (st) {

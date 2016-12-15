@@ -10,11 +10,12 @@ Björn Westerberg Nauclér (mail@bnaucler.se) 2016
 ## Usage
 Output of `ncwb -h`:  
 ```
-Usage: ncwb [-dsp] [message] - NCurses Window Bounce
-Bounces [message] around the screen
+NCurses Window Bounce - Bounces [message] around the screen
 
+Usage: ./ncwb [-dfstp] [message]
 Options:
 	-d: Show debug information
+	-f: Use figlet
 	-h: Displays this text
 	-s [ms]: Sleep per cycle (default: 100)
 	-t: Use current time as message
