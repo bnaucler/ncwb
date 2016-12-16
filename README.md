@@ -12,15 +12,21 @@ Output of `ncwb -h`:
 ```
 NCurses Window Bounce - Bounces [message] around the screen
 
-Usage: ./ncwb [-dfstp] [message]
+Usage: ./ncwb [-dfhlnrstp] [message]
 Options:
 	-d: Show debug information
 	-f: Use figlet
 	-h: Displays this text
-	-s [ms]: Sleep per cycle (default: 100)
+	-l: Leave trail
+	-n: No window movement
+	-r: Random window movement
+	-s [ms]: Sleep per cycle (default: 200)
 	-t: Use current time as message
 	-p [size]: # of chars padding (default: 2)
 ```
+
+## Disclaimer
+It's pretty buggy. Expect it to do kind of what you ask it to, but not exactly.
 
 ## License
 MIT (Do whatever you want)

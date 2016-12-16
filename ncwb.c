@@ -27,44 +27,26 @@ int ncinit() {
 	return 0;
 }
 
-WINDOW *mkwin(char *str, int wh, int ww, int wsy, int wsx, int pad, int cp) {
-
-	WINDOW *lwin;
+int prwtxt(WINDOW *lwin, char *str, int pad, int cp) {
 
 	char *token = calloc(SBCH, sizeof(char));
+	char buf[SBCH];
 
-	lwin = newwin(wh, ww, wsy, wsx);
-	wbkgd(lwin, COLOR_PAIR(cp));
-	attron(COLOR_PAIR(cp));
-	box(lwin, 0 , 0);
+	token = strtok(str, "\n");
+	int vloc = pad + 1;
 
-	if (strstr(str, "\n") == NULL) {
-		mvwprintw(lwin, pad + 1, pad + 1, "%s", str);
+	wattron(lwin, A_BOLD);
 
-	} else {
-		token = strtok(str, "\n");
-		int vloc = pad + 1;
-
-		while(token != NULL) {
-			strcpy(str, token);
-			mvwprintw(lwin, vloc++, pad + 1, "%s", str);
-			token = strtok(NULL, "\n");
-		}
+	while(token != NULL) {
+		strcpy(buf, token);
+		mvwprintw(lwin, vloc++, pad + 1, "%s", buf);
+		token = strtok(NULL, "\n");
 	}
 
-	refresh();
-	wrefresh(lwin);
-	attroff(COLOR_PAIR(cp));
+	wattroff(lwin, A_BOLD);
 
 	free(token);
-	return lwin;
-}
-
-void dwin(WINDOW *lwin) {
-
-	wborder(lwin, ' ', ' ', ' ',' ',' ',' ',' ',' ');
-	wrefresh(lwin);
-	delwin(lwin);
+	return 0;
 }
 
 int cchar(char *buf, char ch) {
@@ -82,12 +64,15 @@ int usage(char *cmd, char *err, int ret) {
 
 	if (strlen(err) > 0 ) { printf(RED "ERROR: " RESET "%s\n", err); }
 	printf("NCurses Window Bounce - Bounces [message] around the screen\n\n");
-	printf("Usage: %s [-dfstp] [message]\n", cmd);
+	printf("Usage: %s [-dfhlnrstp] [message]\n", cmd);
 	printf("Options:\n");
 	printf("	-d: Show debug information\n");
 	printf("	-f: Use figlet\n");
 	printf("	-h: Displays this text\n");
-	printf("	-s [ms]: Sleep per cycle (default: 100)\n");
+	printf("	-l: Leave trail\n");
+	printf("	-n: No window movement\n");
+	printf("	-r: Random window movement\n");
+	printf("	-s [ms]: Sleep per cycle (default: 200)\n");
 	printf("	-t: Use current time as message\n");
 	printf("	-p [size]: # of chars padding (default: 2)\n");
 
@@ -142,23 +127,47 @@ char *mktstr(char *str, time_t *t, struct tm *tm) {
 	return str;
 }
 
+int mknv(int cur, int dir, int max, int rm) {
+
+	if (rm) {
+		cur = rand() % max;
+
+	} else {
+		if (dir) ++cur;
+		else --cur;
+	}
+
+	return cur;
+}
+
+int cdir(int cur, int dir, int max) {
+
+	if(cur > max - 1) dir = 0;
+	if(cur < 1) dir = 1;
+
+	return dir;
+}
+
 int main(int argc, char *argv[]) {
 
 	signal(SIGINT, cleanup);
 
 	char *str = calloc(BBCH, sizeof(char));
+	char *fstr = calloc(BBCH, sizeof(char));
 	char *estr = calloc(SBCH, sizeof(char));
 
-	int debug = 0, fig = 0, st = 0;
-	int pad = 2, lns = 1;
-	unsigned long slp = 100000;
+	int debug = 0, fig = 0, st = 0, nb = 0, tl = 0, rm = 0;
+	int pad = 2, lns = 1, plen = 0;
+	int cp = 2;
+	int optc;
+
+	unsigned long slp = 200000;
 
 	time_t t = time(NULL);
 	struct tm tm = *localtime(&t);
+	srand((unsigned) time(&t));
 
-	int optc;
-
-	while((optc = getopt(argc, argv, "dfhts:p:")) != -1) {
+	while((optc = getopt(argc, argv, "dfhlnp:trs:")) != -1) {
 		switch (optc) {
 
 			case 'd':
@@ -169,6 +178,26 @@ int main(int argc, char *argv[]) {
 				fig++;
 				break;
 
+			case 'h':
+				return usage(argv[0], "", 0);
+				break;
+
+			case 'l':
+				tl++;
+				break;
+
+			case 'n':
+				nb++;
+				break;
+
+			case 'p':
+				pad = atoi(optarg);
+				break;
+
+			case 'r':
+				rm++;
+				break;
+
 			case 's':
 				slp = atoi(optarg) * 1000;
 				if (slp <= 0) return usage(argv[0], "", 0);
@@ -176,14 +205,6 @@ int main(int argc, char *argv[]) {
 
 			case 't':
 				st++;
-				break;
-
-			case 'h':
-				return usage(argv[0], "", 0);
-				break;
-
-			case 'p':
-				pad = atoi(optarg);
 				break;
 
 			case '?':
@@ -208,34 +229,32 @@ int main(int argc, char *argv[]) {
 	int len = strlen(str);
 
 	if (fig) {
-		if (st) { 
-			return usage(argv[0], "-t and -f cannot be combined", 1);
-		} else { 
+		if (st) {
+			strcpy(str, mktstr(str, &t, &tm));
+			strcpy(fstr, mkfstr(str, estr, str , &len));
+
+		} else {
 			strcpy(str, mkfstr(str, estr, argv[0], &len));
-			lns = cchar(str, '\n');
+			str++;
 		}
+		lns = cchar(str, '\n');
 	}
 
 	ncinit();
-	WINDOW *txwin;
-
-	int cp = 2;
+	WINDOW *txwin = calloc(BBCH, sizeof(char));
 
 	int wh = (pad * 2) + 2 + lns;
 	int ww = len + (pad * 2) + 2;
 	int wsy = (LINES / 2) - (pad + 1 + (lns / 2));
 	int wsx = (COLS / 2) - ((len / 2) + pad);
 
-	int xi = 0, yi = 0;
+	int xi = 1, yi = 0;
 
 	if (LINES < (pad * 2) + 3 || COLS < (pad * 2) + len + 2) {
 		curs_set(1);
 		endwin();
 		return usage(argv[0], "Unreasonable padding!", 1);
 	}
-
-	bkgd(COLOR_PAIR(1));
-	refresh();
 
 	if (debug) {
 		mvprintw(5,5,"Window height: %03d", wh);
@@ -246,42 +265,55 @@ int main(int argc, char *argv[]) {
 		mvprintw(10,5,"String height: %02d", lns);
 	}
 
-	txwin = mkwin(str, wh, ww, wsy, wsx, pad, cp);
+	bkgd(COLOR_PAIR(1));
+	refresh();
+	txwin = newwin(wh, ww, wsy, wsx);
+	box(txwin, 0, 0);
+	prwtxt(txwin, str, pad, cp);
 
 	for (;;) {
 
-		if (xi == 0) {
-			wsx--;
-			if (wsx == 0) xi++;
+		if (!nb) {
+			wsx = mknv(wsx, xi, COLS - ww, rm);
+			wsy = mknv(wsy, yi, LINES - wh, rm);
 
-		} else {
-			wsx++;
-			if (wsx > COLS - ww) xi = 0;
-		}
-
-		if (yi == 0) {
-			wsy--;
-			if (wsy == 0) yi++;
-
-		} else {
-			wsy++;
-			if (wsy > LINES - wh) yi = 0;
+			xi = cdir(wsx, xi, COLS - ww);
+			yi = cdir(wsy, yi, LINES - wh);
 		}
 
 		if (debug) {
 			mvprintw(7,5,"Upper left corner, X-axis: %03d", wsx);
 			mvprintw(8,5,"Upper left corner, Y-axis: %03d", wsy);
+			mvprintw(9,5,"String length: %02d", len);
 		}
 
 		if (st) {
 			strcpy(str, mktstr(str, &t, &tm));
-			mvwprintw(txwin, pad + 1, pad + 1, "%s", str);
+
+			if (fig) {
+				strcpy(fstr, mkfstr(str, estr, str , &len));
+
+				if (len != plen) {
+					ww = len + (pad * 2) + 2;
+					wresize(txwin, wh, ww);
+					werase(txwin);
+					wrefresh(txwin);
+					plen = len;
+				}
+
+				prwtxt(txwin, fstr, pad, cp);
+				box(txwin, 0, 0);
+				wrefresh(txwin);
+				if (!tl) refresh();
+
+			} else {
+				mvwprintw(txwin, pad + 1, pad + 1, "%s", str);
+			}
 		}
 
 		mvwin(txwin, wsy, wsx);
-		wbkgd(txwin, COLOR_PAIR(cp));
 		bkgd(COLOR_PAIR(1));
-		refresh();
+		if (!tl) refresh();
 		wrefresh(txwin);
 		usleep(slp);
 	}
