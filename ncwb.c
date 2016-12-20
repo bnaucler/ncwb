@@ -21,8 +21,12 @@ int ncinit() {
 	start_color();
 	use_default_colors();
 
-	init_pair(1, COLOR_RED, -1);
-	init_pair(2, COLOR_BLACK, COLOR_RED);
+	init_pair(1, -1, -1);
+	init_pair(2, COLOR_WHITE, -1);
+	init_pair(3, COLOR_RED, -1);
+	init_pair(4, COLOR_GREEN, -1);
+	init_pair(5, COLOR_BLACK, COLOR_WHITE);
+	init_pair(6, COLOR_BLACK, COLOR_RED);
 
 	return 0;
 }
@@ -66,6 +70,7 @@ int usage(char *cmd, char *err, int ret) {
 	printf("NCurses Window Bounce - Bounces [message] around the screen\n\n");
 	printf("Usage: %s [-dfhlnrstp] [message]\n", cmd);
 	printf("Options:\n");
+	printf("	-c: Color pair [1-6] (default: 1)\n");
 	printf("	-d: Show debug information\n");
 	printf("	-f: Use figlet\n");
 	printf("	-h: Displays this text\n");
@@ -148,6 +153,16 @@ int cdir(int cur, int dir, int max) {
 	return dir;
 }
 
+void prdbg(int wh, int ww, int wsx, int wsy, int len, int lns) {
+
+	mvprintw(5,5,"Window height: %d", wh);
+	mvprintw(6,5,"Window width: %02d", ww);
+	mvprintw(7,5,"Upper left corner, X-axis: %03d", wsx);
+	mvprintw(8,5,"Upper left corner, Y-axis: %03d", wsy);
+	mvprintw(9,5,"String length: %02d", len);
+	mvprintw(10,5,"String height: %02d", lns);
+}
+
 int main(int argc, char *argv[]) {
 
 	signal(SIGINT, cleanup);
@@ -158,7 +173,7 @@ int main(int argc, char *argv[]) {
 
 	int debug = 0, fig = 0, st = 0, nb = 0, tl = 0, rm = 0;
 	int pad = 2, lns = 1, plen = 0;
-	int cp = 2;
+	int cp = 1;
 	int optc;
 
 	unsigned long slp = 200000;
@@ -167,8 +182,12 @@ int main(int argc, char *argv[]) {
 	struct tm tm = *localtime(&t);
 	srand((unsigned) time(&t));
 
-	while((optc = getopt(argc, argv, "dfhlnp:trs:")) != -1) {
+	while((optc = getopt(argc, argv, "c:dfhlnp:trs:")) != -1) {
 		switch (optc) {
+
+			case 'c':
+				cp = atoi(optarg);
+				break;
 
 			case 'd':
 				debug++;
@@ -256,18 +275,10 @@ int main(int argc, char *argv[]) {
 		return usage(argv[0], "Unreasonable padding!", 1);
 	}
 
-	if (debug) {
-		mvprintw(5,5,"Window height: %03d", wh);
-		mvprintw(6,5,"Window width: %03d", ww);
-		mvprintw(7,5,"Upper left corner, X-axis: %03d", wsx);
-		mvprintw(8,5,"Upper left corner, Y-axis: %03d", wsy);
-		mvprintw(9,5,"String length: %02d", len);
-		mvprintw(10,5,"String height: %02d", lns);
-	}
-
 	bkgd(COLOR_PAIR(1));
 	refresh();
 	txwin = newwin(wh, ww, wsy, wsx);
+	wbkgd(txwin, COLOR_PAIR(cp));
 	box(txwin, 0, 0);
 	prwtxt(txwin, str, pad, cp);
 
@@ -277,14 +288,10 @@ int main(int argc, char *argv[]) {
 			wsx = mknv(wsx, xi, COLS - ww, rm);
 			wsy = mknv(wsy, yi, LINES - wh, rm);
 
-			xi = cdir(wsx, xi, COLS - ww);
-			yi = cdir(wsy, yi, LINES - wh);
-		}
-
-		if (debug) {
-			mvprintw(7,5,"Upper left corner, X-axis: %03d", wsx);
-			mvprintw(8,5,"Upper left corner, Y-axis: %03d", wsy);
-			mvprintw(9,5,"String length: %02d", len);
+			if (!rm) {
+				xi = cdir(wsx, xi, COLS - ww);
+				yi = cdir(wsy, yi, LINES - wh);
+			}
 		}
 
 		if (st) {
@@ -311,8 +318,11 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
+		if (debug) { prdbg(wh, ww, wsx, wsy, len, lns); }
+
 		mvwin(txwin, wsy, wsx);
 		bkgd(COLOR_PAIR(1));
+		wbkgd(txwin, COLOR_PAIR(cp));
 		if (!tl) refresh();
 		wrefresh(txwin);
 		usleep(slp);
