@@ -135,7 +135,7 @@ char *mktstr(char *str, time_t *t, struct tm *tm) {
 int mknv(int cur, int dir, int max, int rm) {
 
 	if (rm) {
-		cur = rand() % max;
+		cur = rand() % ++max;
 
 	} else {
 		if (dir) ++cur;
@@ -279,8 +279,9 @@ int main(int argc, char *argv[]) {
 	refresh();
 	txwin = newwin(wh, ww, wsy, wsx);
 	wbkgd(txwin, COLOR_PAIR(cp));
-	box(txwin, 0, 0);
 	prwtxt(txwin, str, pad, cp);
+	box(txwin, 0, 0);
+	touchwin(txwin);
 
 	for (;;) {
 
@@ -304,13 +305,11 @@ int main(int argc, char *argv[]) {
 					ww = len + (pad * 2) + 2;
 					wresize(txwin, wh, ww);
 					werase(txwin);
-					wrefresh(txwin);
 					plen = len;
 				}
 
 				prwtxt(txwin, fstr, pad, cp);
-				box(txwin, 0, 0);
-				wrefresh(txwin);
+				wborder(txwin, '|', '|', '-', '-', '+', '+', '+', '+');
 				if (!tl) refresh();
 
 			} else {
