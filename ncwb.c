@@ -68,9 +68,9 @@ int usage(char *cmd, char *err, int ret) {
 
 	if (strlen(err) > 0 ) { printf(RED "ERROR: " RESET "%s\n", err); }
 	printf("NCurses Window Bounce - Bounces [message] around the screen\n\n");
-	printf("Usage: %s [-dfhlnrstp] [message]\n", cmd);
+	printf("Usage: %s [-cdfhlnrstp] [message]\n", cmd);
 	printf("Options:\n");
-	printf("	-c: Color pair [1-6] (default: 1)\n");
+	printf("	-c [num]: Color pair 1-6 (default: 1)\n");
 	printf("	-d: Show debug information\n");
 	printf("	-f: Use figlet\n");
 	printf("	-h: Displays this text\n");

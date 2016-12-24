@@ -14,9 +14,9 @@ Output of `ncwb -h`:
 ```
 NCurses Window Bounce - Bounces [message] around the screen
 
-Usage: ./ncwb [-dfhlnrstp] [message]
+Usage: ncwb [-cdfhlnrstp] [message]
 Options:
-	-c: Color pair 1-6 (default: 1)
+	-c [num]: Color pair 1-6 (default: 1)
 	-d: Show debug information
 	-f: Use figlet
 	-h: Displays this text
