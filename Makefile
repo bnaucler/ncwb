@@ -2,10 +2,13 @@ CC = cc
 TARGET = ncwb
 SOURCE = ncwb.c
 DESTDIR = /usr/bin
-CFLAGS= -Wall -g -lncurses
+CFLAGS ?= -Wall -g
+CFLAGS += -std=c99 -Wall -g
+LDLIBS += -lncurses
 
-all:
-	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCE)
+all: $(TARGET)
+
+$(TARGET): $(SOURCE)
 
 clean:
 	rm -f $(TARGET)
