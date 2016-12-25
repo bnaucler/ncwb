@@ -5,6 +5,8 @@
 #include <signal.h>
 #include <time.h>
 
+#define VER 0.2
+
 #define SMAXLEN 50
 #define SBCH 256
 #define BBCH 1024
@@ -67,7 +69,7 @@ int cchar(char *buf, char ch) {
 int usage(char *cmd, char *err, int ret) {
 
 	if (strlen(err) > 0 ) { printf(RED "ERROR: " RESET "%s\n", err); }
-	printf("NCurses Window Bounce - Bounces [message] around the screen\n\n");
+	printf("NCurses Window Bounce v%.1f - Bounces [message] around the screen\n\n", VER);
 	printf("Usage: %s [-cdfhlnrstp] [message]\n", cmd);
 	printf("Options:\n");
 	printf("	-c [num]: Color pair 1-6 (default: 1)\n");
